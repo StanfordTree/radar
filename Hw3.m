@@ -45,16 +45,11 @@ grid on
 for i = 1:10100
     new_signal(:,i) = signal_fft(:,i).*conj(chp_fft).';
 end
-%%
 new_signal_td = (ifft(new_signal,[],1));
-% new_signal_td = abs(new_signal_td);
 img = imagesc(abs(new_signal_td))
 %% Range compress again in a different way
-% signal_spec = fft(curr_line,[], 1);
-% signal_td = ifft(signal_spec.*conj(chirp_FFT));
 az_spec = fft(new_signal_td,[],2);
 avg_az = mean(abs(az_spec),1);
-%%
 
 %% Plotting for 1a
 clc
@@ -67,8 +62,6 @@ xlabel('PRF')
 title('Azimuth spectrum averaged over range')
 ylabel('Power')
 
-%%
-%f_centroid = 1370.9;
 
 
 %% 1b
@@ -85,4 +78,65 @@ end
 
 phase = angle(sum_per_bin);
 centroid = (PRF)*(mean(phase)/(2*pi));
+
+%% Q2
+f_centroid = -308.97;
+clc
+close all
+
+for i = 1:size(new_signal_td,1)
+    for j = 1:64
+        adj_single_look(i,j) = new_signal_td(i,j)*exp(complex(0,2*pi*f_centroid-(j/PRF)));
+    end
+end
+az_fft_single_look = fft(adj_single_look,[],2);
+
+img = imagesc(abs(az_fft_single_look)');
+xlabel('Azimuth')
+ylabel('Range')
+title('Single look azimuth processed image')
 %%
+clc
+
+clear az_single n image_mat az_multi_look
+tic
+image_mat = zeros(size(new_signal_td));
+counter = 2;
+n = 2;
+j = 1;
+l = 0;
+while (64*l + 64) <= 10100
+    
+    n = round((counter-1)*3.51);
+    shift_no = n;
+    for i = 1:size(new_signal_td,1)
+        k = 1;
+        for j = (64*l + 1):(64*l + 64)
+            % we generate one range compressed image...not yet fft'd in
+            % azimuth
+            az_single(i,k) = new_signal_td(i,j)*exp(complex(0,2*pi*f_centroid-(j/PRF)));
+            k = k+1;
+        end
+    end
+     l = l+1;
+     az_multi_look = fft(az_single,[],2);  %%fft'ing in azimuth dir. 
+     image_mat(:,n:n+63) = image_mat(:,n:n+63) + az_multi_look;
+     
+     % image_mat = image_mat + comb_mat;
+     counter = counter+1;
+     az_single = zeros(4903,64);
+     % comb_mat = zeros(4903,10100);
+end
+toc
+
+%%
+close all
+image_mat = image_mat(:,1:613);
+
+full_im = imagesc(2*abs(image_mat)')
+colorbar
+clim([1e4 0.8e5])
+xlabel('Range')
+ylabel('Elevation')
+title('Unfocused range-dopplar processed image')
+
